@@ -1,8 +1,10 @@
 import streamlit as st
 import pandas as pd
 import numpy as np
+import time
 import plotly.graph_objects as go
 from datetime import date,timedelta
+from money_shower import money_showers,money_shower_loss
 from model.predictor import predict_stock
 from utils.data_loader import load_stock_data
 from utils.indicators import add_indicators
@@ -10,6 +12,7 @@ from utils.indicators import add_indicators
 # ======================================================
 # PAGE CONFIG
 # ======================================================
+
 
 st.set_page_config(
     page_title="AI Stock Prediction System",
@@ -78,10 +81,10 @@ with col1:
     )
 
 if "start_date" not in st.session_state:
-    st.session_state.start_date = None
+    st.session_state.start_date = date(2026,1,1)
 
 if "end_date" not in st.session_state:
-    st.session_state.end_date = None
+    st.session_state.end_date = date.today()
 if (
     st.session_state.start_date and
     st.session_state.end_date
@@ -135,17 +138,35 @@ all_fields_filled = (
 predict_button = st.button("🚀 Predict Stocks",disabled=not all_fields_filled)
 st.divider()
 if predict_button:
-
     ticker = stock_options[selected_stocks]
     st.header(f"📈 {selected_stocks}")
     # LOAD DATA
+    progress_container = st.empty()
+    status_text=st.empty()
+    progress_bar = progress_container.progress(0)
+    status_text = st.empty()
+
+    for i in range(30):
+        time.sleep(0.05)
+        status_text.markdown('⌛ Fetching stock market data ....</p>', 
+            unsafe_allow_html=True)
+        progress_bar.progress((i + 1))
     df = load_stock_data(
         ticker,
         start_date,
         end_date
     )
+    for i in range(30,100,10):
+        time.sleep(0.5)
+        status_text.markdown(" ⌛ Loading data into model ....")
+        progress_bar.progress((i + 10)) 
+    status_text.empty()   
+    progress_container.empty()
+
+
     if df.empty:
         st.error(f"No data found for {ticker}")
+        st.stop()
 
     # ADD INDICATORS
     df = add_indicators(df)
@@ -177,7 +198,8 @@ if predict_button:
     # PREDICTION
 
     try:
-        actual, predicted, future_predictions, accuracy = predict_stock(df)
+        with st.spinner("🚀 Generating AI-powered predictions..."):
+            actual, predicted, future_predictions, accuracy = predict_stock(df)
 
     except Exception as e:
         st.error(f"Prediction failed: {str(e)}")
@@ -222,19 +244,36 @@ if predict_button:
         use_container_width=True
     )
     # FUTURE FORECAST
+    future_days = [
+    f"Day {i}"
+    for i in range(1, len(future_predictions) + 1)
+    ]
+
     future_chart = go.Figure()
+
     future_chart.add_trace(go.Scatter(
+        x=future_days,
         y=future_predictions,
         mode='lines+markers',
-        name='30 Day Forecast'
+            name='Forecast',
+        line=dict(width=3)
     ))
+
     future_chart.update_layout(
         title=f"{ticker} Future 30-Day Forecast",
         template="plotly_dark",
         height=500,
         xaxis_title="Future Days",
-        yaxis_title="Predicted Price"
+        yaxis_title="Predicted Price (USD)",
+        hovermode="x unified"
     )
+    first_forecast = future_predictions[0]
+    final_forecast = future_predictions[-1]
+    price_change = final_forecast - first_forecast
+    if price_change > 0:
+        money_showers()
+    else:
+        money_shower_loss()
     st.plotly_chart(
         future_chart,
         use_container_width=True
