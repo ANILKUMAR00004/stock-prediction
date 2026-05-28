@@ -23,11 +23,22 @@ def train_lstm(df):
 
     X = np.array(X)
     y = np.array(y)
+    if len(X) == 0:
+        raise ValueError(
+            "Not enough stock data to train the model. "
+            "Please select a larger date range."
+    )
+
 
     X = np.reshape(X, (X.shape[0], X.shape[1], 1))
 
     X_train, X_test, y_train, y_test = train_test_split(
         X, y, test_size=0.2, random_state=42
+    )
+    if len(X) == 0:
+        raise ValueError(
+            "Not enough stock data to train the model. "
+            "Please select a larger date range."
     )
 
     model = Sequential()
